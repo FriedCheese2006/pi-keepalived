@@ -1,0 +1,9 @@
+.git
+.gitea
+.github
+.vscode
+.env
+*.log
+README.md
+docker-compose*.yaml
+tests
