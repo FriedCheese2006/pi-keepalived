@@ -63,7 +63,7 @@ validate_cidr() {
     variable_name=$1
     variable_value=$2
     case "$variable_value" in
-        */*/*|/*|*/|'') fail "$variable_name must be an IPv4 address with a prefix, for example 10.21.85.2/24" ;;
+        */*/*|/*|*/|'') fail "$variable_name must be an IPv4 address with a prefix, for example 192.0.2.10/24" ;;
     esac
 
     cidr_address=${variable_value%/*}

@@ -43,9 +43,9 @@ assert_not_contains() {
 render_config() {
     docker run --rm \
         -e VRRP_PRIORITY=110 \
-        -e VRRP_VIRTUAL_IP=10.21.85.2/24 \
-        -e VRRP_UNICAST_SRC_IP=10.21.85.4 \
-        -e VRRP_UNICAST_PEERS=10.21.85.5 \
+        -e VRRP_VIRTUAL_IP=192.0.2.10/24 \
+        -e VRRP_UNICAST_SRC_IP=192.0.2.11 \
+        -e VRRP_UNICAST_PEERS=192.0.2.12 \
         "$@" \
         "$IMAGE" config-test
 }
@@ -64,23 +64,23 @@ expect_config_failure() {
 
 primary_output=$(render_config)
 assert_contains "$primary_output" 'priority 110' 'primary config generation'
-assert_contains "$primary_output" 'unicast_src_ip 10.21.85.4' 'primary config generation'
-assert_contains "$primary_output" '        10.21.85.5' 'primary config generation'
+assert_contains "$primary_output" 'unicast_src_ip 192.0.2.11' 'primary config generation'
+assert_contains "$primary_output" '        192.0.2.12' 'primary config generation'
 pass 'primary config generation'
 
 secondary_output=$(render_config \
     -e VRRP_PRIORITY=100 \
-    -e VRRP_UNICAST_SRC_IP=10.21.85.5 \
-    -e VRRP_UNICAST_PEERS=10.21.85.4)
+    -e VRRP_UNICAST_SRC_IP=192.0.2.12 \
+    -e VRRP_UNICAST_PEERS=192.0.2.11)
 assert_contains "$secondary_output" 'state BACKUP' 'secondary config generation'
 assert_contains "$secondary_output" 'priority 100' 'secondary config generation'
-assert_contains "$secondary_output" 'unicast_src_ip 10.21.85.5' 'secondary config generation'
+assert_contains "$secondary_output" 'unicast_src_ip 192.0.2.12' 'secondary config generation'
 pass 'secondary config generation'
 
-peers_output=$(render_config -e 'VRRP_UNICAST_PEERS=10.21.85.5, 10.21.85.6 10.21.85.7')
-assert_contains "$peers_output" '        10.21.85.5' 'multiple unicast peers'
-assert_contains "$peers_output" '        10.21.85.6' 'multiple unicast peers'
-assert_contains "$peers_output" '        10.21.85.7' 'multiple unicast peers'
+peers_output=$(render_config -e 'VRRP_UNICAST_PEERS=192.0.2.12, 192.0.2.13 192.0.2.14')
+assert_contains "$peers_output" '        192.0.2.12' 'multiple unicast peers'
+assert_contains "$peers_output" '        192.0.2.13' 'multiple unicast peers'
+assert_contains "$peers_output" '        192.0.2.14' 'multiple unicast peers'
 pass 'multiple unicast peers'
 
 nopreempt_output=$(render_config -e VRRP_PREEMPT=false)
@@ -124,7 +124,7 @@ case " $* " in
 esac
 cat <<'RESPONSE'
 ;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 1
-pi.hole. 60 IN A 10.21.85.4
+pi.hole. 60 IN A 192.0.2.11
 RESPONSE
 EOF
 
