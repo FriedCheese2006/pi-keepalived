@@ -59,30 +59,33 @@ sidecar root filesystem, and mounts only `/run/keepalived` as tmpfs. It does not
 mount a Keepalived configuration. Create an external macvlan or ipvlan network
 appropriate for the host first; for example, adjust the parent and gateway:
 
+All addresses in this section use the RFC 5737 documentation range and must be
+replaced with addresses from the deployment network.
+
 ```sh
 docker network create --driver macvlan \
-	--subnet 10.21.85.0/24 --gateway 10.21.85.1 \
-	--opt parent=eth0 pihole_lan
+	--subnet 192.0.2.0/24 --gateway 192.0.2.1 \
+	--opt parent=enp1s0 pihole_lan
 ```
 
-On Hermes, place these values in the deployment environment (for example a
-root-readable `.env` next to a local copy of the example):
+On the higher-priority node, place these values in the deployment environment
+(for example a root-readable `.env` next to a local copy of the example):
 
 ```dotenv
-NODE_NAME=hermes
-PIHOLE_ADDRESS=10.21.85.4
+NODE_NAME=pihole-a
+PIHOLE_ADDRESS=192.0.2.11
 VRRP_PRIORITY=110
-VRRP_UNICAST_PEER=10.21.85.5
+VRRP_UNICAST_PEER=192.0.2.12
 PIHOLE_PASSWORD=replace-with-a-node-specific-password
 ```
 
-On Behemoth:
+On the lower-priority node:
 
 ```dotenv
-NODE_NAME=behemoth
-PIHOLE_ADDRESS=10.21.85.5
+NODE_NAME=pihole-b
+PIHOLE_ADDRESS=192.0.2.12
 VRRP_PRIORITY=100
-VRRP_UNICAST_PEER=10.21.85.4
+VRRP_UNICAST_PEER=192.0.2.11
 PIHOLE_PASSWORD=replace-with-a-node-specific-password
 ```
 
@@ -113,9 +116,9 @@ or security policy proves it necessary. Multicast mode still requires
 `NET_ADMIN` and `NET_RAW`.
 
 Allow IP protocol **112** (VRRP), not TCP or UDP port 112, in both directions
-between `10.21.85.4` and `10.21.85.5`. The addresses must be directly routable
-between peers. For multicast mode, the network must also carry VRRP multicast
-traffic to `224.0.0.18`.
+between each node's `VRRP_UNICAST_SRC_IP` and `VRRP_UNICAST_PEERS`. The
+addresses must be directly routable between peers. For multicast mode, the
+network must also carry VRRP multicast traffic to `224.0.0.18`.
 
 ## Configuration
 
@@ -124,7 +127,7 @@ traffic to `224.0.0.18`.
 | `VRRP_INTERFACE` | `eth0` | Linux interface name, at most 15 characters |
 | `VRRP_VIRTUAL_ROUTER_ID` | `51` | Integer 1-255; must match on both nodes |
 | `VRRP_PRIORITY` | required | Integer 1-255; higher wins |
-| `VRRP_VIRTUAL_IP` | required | IPv4 CIDR, such as `10.21.85.2/24` |
+| `VRRP_VIRTUAL_IP` | required | IPv4 CIDR, such as `192.0.2.10/24` |
 | `VRRP_UNICAST_SRC_IP` | required in unicast | Local Pi-hole IPv4 address |
 | `VRRP_UNICAST_PEERS` | required in unicast | Comma- or space-separated peer IPv4 addresses |
 | `VRRP_INSTANCE_NAME` | `VI_1` | Keepalived instance identifier |
@@ -177,24 +180,25 @@ docker compose -f docker-compose.example.yaml exec keepalived \
 ```
 
 For a rollout, first verify protocol 112 between the node addresses and deploy
-Behemoth at priority 100. Confirm its logs show valid configuration and BACKUP,
-then deploy Hermes at priority 110. Confirm `10.21.85.2` is present on Hermes and
-query the VIP from a third machine. Upgrade or restart the BACKUP first, verify
-it rejoins, then upgrade the MASTER.
+the lower-priority node. Confirm its logs show valid configuration and BACKUP,
+then deploy the higher-priority node. Confirm the VIP is present on the elected
+master and query it from a third machine. Upgrade or restart the BACKUP first,
+verify it rejoins, then upgrade the MASTER.
 
 To test failover, continuously query the VIP from a third machine, stop Pi-hole
 on the current master, and watch Keepalived logs on both nodes:
 
 ```sh
-dig @10.21.85.2 pi.hole
+dig @192.0.2.10 pi.hole
 docker compose -f docker-compose.example.yaml stop pihole
 docker compose -f docker-compose.example.yaml logs --follow keepalived
 ```
 
 After at least `HEALTHCHECK_FALL` failed checks, the VIP should appear on the
 peer. Start Pi-hole again, wait for `HEALTHCHECK_RISE` successes, and verify the
-election behavior. With preemption enabled, Hermes should retake the VIP; with
-`VRRP_PREEMPT=false`, the healthy current master retains it.
+election behavior. With preemption enabled, the healthy higher-priority node
+should retake the VIP; with `VRRP_PREEMPT=false`, the healthy current master
+retains it.
 
 ## GitHub CI/CD
 
@@ -205,9 +209,8 @@ provenance and an SBOM. Scheduled builds use `--pull` and no cache, so Alpine
 base changes are incorporated; removed or changed pinned packages fail loudly
 and require an intentional version update.
 
-GitHub-hosted Linux runners provide Docker and QEMU. Publishing to
-`ghcr.io/friedcheese2006/pi-keepalived` uses the built-in `GITHUB_TOKEN`, so no
-registry secrets are required. Push `v1.0.0` to publish the `:1.0.0` tag used by
-the Compose example; `latest` and immutable `sha-<commit>` tags are also
-published.
+GitHub-hosted Linux runners provide Docker and QEMU. Publishing to GitHub
+Container Registry uses the built-in `GITHUB_TOKEN`, so no registry secrets are
+required. Push `v1.0.0` to publish the `:1.0.0` tag used by the Compose example;
+`latest` and immutable `sha-<commit>` tags are also published.
 
