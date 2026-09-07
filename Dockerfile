@@ -8,7 +8,7 @@ ARG COREUTILS_VERSION=9.8-r1
 
 LABEL org.opencontainers.image.title="Pi-hole Keepalived" \
       org.opencontainers.image.description="Environment-configured Keepalived sidecar for Pi-hole" \
-      org.opencontainers.image.source="https://gitea.thecheesewheel.org/friedcheese2006/pi-keepalived" \
+    org.opencontainers.image.source="https://github.com/FriedCheese2006/pi-keepalived" \
       org.opencontainers.image.licenses="MIT"
 
 RUN apk upgrade --no-cache \

@@ -196,23 +196,18 @@ peer. Start Pi-hole again, wait for `HEALTHCHECK_RISE` successes, and verify the
 election behavior. With preemption enabled, Hermes should retake the VIP; with
 `VRRP_PREEMPT=false`, the healthy current master retains it.
 
-## Gitea CI/CD
+## GitHub CI/CD
 
-[.gitea/workflows/ci.yaml](.gitea/workflows/ci.yaml) runs on pull requests,
+[.github/workflows/ci.yaml](.github/workflows/ci.yaml) runs on pull requests,
 `main`, version tags, manual dispatch, and every Monday at 04:17 UTC. It runs
 ShellCheck, all tests, and Trivy before publishing an amd64/arm64 image with
 provenance and an SBOM. Scheduled builds use `--pull` and no cache, so Alpine
 base changes are incorporated; removed or changed pinned packages fail loudly
 and require an intentional version update.
 
-Configure these repository Actions secrets:
-
-- `REGISTRY_USERNAME`: Gitea user allowed to publish packages.
-- `REGISTRY_PASSWORD`: token with package write permission.
-
-The workflow assumes a Docker-capable Linux runner whose user can create
-networks, add `NET_ADMIN`/`NET_RAW` to test containers, run binfmt/QEMU, and
-publish to `gitea.thecheesewheel.org`. It derives the image path from the Gitea
-repository owner/name. Push `v1.0.0` to publish the `:1.0.0` tag used by the
-Compose example; `latest` and immutable `sha-<commit>` tags are also published.
+GitHub-hosted Linux runners provide Docker and QEMU. Publishing to
+`ghcr.io/friedcheese2006/pi-keepalived` uses the built-in `GITHUB_TOKEN`, so no
+registry secrets are required. Push `v1.0.0` to publish the `:1.0.0` tag used by
+the Compose example; `latest` and immutable `sha-<commit>` tags are also
+published.
 

@@ -22,7 +22,7 @@ services:
       start_period: 30s
 
   keepalived:
-    image: gitea.thecheesewheel.org/friedcheese2006/pi-keepalived:1.0.0
+    image: ghcr.io/friedcheese2006/pi-keepalived:1.0.0
     network_mode: "service:pihole"
     depends_on:
       pihole:
