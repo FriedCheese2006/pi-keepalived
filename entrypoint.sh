@@ -225,6 +225,7 @@ validate_environment() {
 render_config() {
     config_temp=$(mktemp "$CONFIG_DIR/keepalived.conf.XXXXXX") ||
         fail "$CONFIG_DIR must be writable; mount a tmpfs there when using a read-only root filesystem"
+    script_timeout=$((HEALTHCHECK_TIMEOUT + 1))
     trap 'rm -f "${config_temp:-}" "$VALIDATION_LOG"' EXIT HUP INT TERM
 
     {
@@ -237,7 +238,7 @@ render_config() {
             printf 'vrrp_script check_dns {\n'
             printf '    script "/usr/local/bin/check-dns.sh"\n'
             printf '    interval %s\n' "$HEALTHCHECK_INTERVAL"
-            printf '    timeout %s\n' "$HEALTHCHECK_TIMEOUT"
+            printf '    timeout %s\n' "$script_timeout"
             printf '    rise %s\n' "$HEALTHCHECK_RISE"
             printf '    fall %s\n' "$HEALTHCHECK_FALL"
             printf '    weight 0\n'

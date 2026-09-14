@@ -1,33 +1,12 @@
 name: "pihole-${NODE_NAME:-node}"
 
 services:
-  pihole:
-    image: pihole/pihole:2026.07.2@sha256:f7d1be836e3bc608b56d82fc9904f5a831cdfbc0dc9c6d58f94e4c985c70038b
+  keepalived:
+    image: ghcr.io/friedcheese2006/pi-keepalived:1.0.0
     hostname: "${NODE_NAME:?set NODE_NAME}"
-    restart: unless-stopped
-    environment:
-      TZ: "${TZ:-UTC}"
-      FTLCONF_dns_listeningMode: "ALL"
-      FTLCONF_webserver_api_password: "${PIHOLE_PASSWORD:?set PIHOLE_PASSWORD}"
-    volumes:
-      - pihole-data:/etc/pihole
     networks:
       lan:
         ipv4_address: "${PIHOLE_ADDRESS:?set PIHOLE_ADDRESS}"
-    healthcheck:
-      test: ["CMD-SHELL", "dig +time=1 +tries=1 +short @127.0.0.1 pi.hole A | grep -qE '^[0-9]+(\\.[0-9]+){3}$'"]
-      interval: 10s
-      timeout: 3s
-      retries: 6
-      start_period: 30s
-
-  keepalived:
-    image: ghcr.io/friedcheese2006/pi-keepalived:1.0.0
-    network_mode: "service:pihole"
-    depends_on:
-      pihole:
-        condition: service_healthy
-        restart: true
     restart: unless-stopped
     cap_drop:
       - ALL
@@ -56,6 +35,26 @@ services:
       HEALTHCHECK_TIMEOUT: "1"
       HEALTHCHECK_RISE: "2"
       HEALTHCHECK_FALL: "2"
+
+  pihole:
+    image: pihole/pihole:2026.07.2@sha256:f7d1be836e3bc608b56d82fc9904f5a831cdfbc0dc9c6d58f94e4c985c70038b
+    network_mode: "service:keepalived"
+    depends_on:
+      keepalived:
+        condition: service_started
+    restart: unless-stopped
+    environment:
+      TZ: "${TZ:-UTC}"
+      FTLCONF_dns_listeningMode: "ALL"
+      FTLCONF_webserver_api_password: "${PIHOLE_PASSWORD:?set PIHOLE_PASSWORD}"
+    volumes:
+      - pihole-data:/etc/pihole
+    healthcheck:
+      test: ["CMD-SHELL", "dig +time=1 +tries=1 +short @127.0.0.1 pi.hole A | grep -qE '^[0-9]+(\\.[0-9]+){3}$'"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 30s
 
 volumes:
   pihole-data:

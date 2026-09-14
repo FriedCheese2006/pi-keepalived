@@ -174,3 +174,5 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
+# Docker compose internal
+compose-internal.yaml

@@ -10,17 +10,20 @@ should normally use `VRRP_STATE=BACKUP`; priority determines the elected master.
 
 ## How it works
 
-Compose's `network_mode: "service:pihole"` puts the sidecar in the Pi-hole
-container's existing network namespace. Keepalived therefore sees Pi-hole's
-interfaces and addresses, adds the VIP there, and can query the local resolver
-at `127.0.0.1`. The sidecar must not define its own networks or published ports.
-Restarting the Pi-hole container recreates that namespace, so Compose's
-`depends_on` restart behavior and `restart: unless-stopped` are important.
+Keepalived owns the network namespace and its connection to the LAN. Compose's
+`network_mode: "service:keepalived"` puts Pi-hole in that namespace, so both
+services use the configured node address and Keepalived can query Pi-hole at
+`127.0.0.1`. Pi-hole must not define its own networks or published ports.
+Restarting Pi-hole leaves the namespace and VRRP interface intact; the health
+script releases the VIP while DNS is unavailable and restores eligibility when
+DNS recovers. The dependency also makes Compose stop Pi-hole before Keepalived,
+allowing Keepalived to advertise its shutdown while the interface still exists.
 
 The generated `vrrp_script` queries `pi.hole` through the configured local DNS
-server. It uses a one-shot `dig` query wrapped by an independent hard timeout,
-requires `NOERROR` and at least one answer record, and never queries through the
-VIP. `weight 0` gives the tracked script fault semantics: after
+server. It uses a one-shot `dig` query wrapped by an independent hard timeout;
+Keepalived allows one additional second for that wrapper to report its result.
+The check requires `NOERROR` and at least one answer record and never queries
+through the VIP. `weight 0` gives the tracked script fault semantics: after
 `HEALTHCHECK_FALL` failures the instance enters FAULT and releases the VIP; it
 recovers after `HEALTHCHECK_RISE` successful checks. `init_fail` prevents a node
 from taking the VIP before DNS first passes.
@@ -99,9 +102,10 @@ The Pi-hole example uses `FTLCONF_dns_listeningMode=ALL`, which is needed when
 serving from a Docker/macvlan interface. It deliberately does not use the
 removed Pi-hole v6 variable `FTLCONF_LOCAL_IPV4`.
 
-Compose implementations that support the long `depends_on` syntax wait for
-Pi-hole to be healthy before starting Keepalived. The VRRP health script remains
-the authority for ongoing failover after startup.
+Compose starts Keepalived first because it owns the shared network namespace.
+The initial failed health state prevents it from claiming the VIP until Pi-hole
+starts and DNS passes the configured rise threshold. The VRRP health script
+remains the authority for ongoing failover.
 
 ## Required capabilities and firewall
 
@@ -146,7 +150,7 @@ network must also carry VRRP multicast traffic to `224.0.0.18`.
 | `HEALTHCHECK_DNS_NAME` | `pi.hole` | Local-mode name that must return an answer |
 | `HEALTHCHECK_RECURSIVE_NAME` | `example.com` | Recursive-mode name that must return an answer |
 | `HEALTHCHECK_INTERVAL` | `2` | Check interval, 1-3600 seconds |
-| `HEALTHCHECK_TIMEOUT` | `1` | Query timeout, 1-60 and no greater than interval |
+| `HEALTHCHECK_TIMEOUT` | `1` | Query timeout, 1-60 and no greater than interval; Keepalived adds a one-second supervisor margin |
 | `HEALTHCHECK_RISE` | `2` | Consecutive successes required to recover |
 | `HEALTHCHECK_FALL` | `2` | Consecutive failures required to enter FAULT |
 

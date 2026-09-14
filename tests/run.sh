@@ -66,6 +66,7 @@ primary_output=$(render_config)
 assert_contains "$primary_output" 'priority 110' 'primary config generation'
 assert_contains "$primary_output" 'unicast_src_ip 192.0.2.11' 'primary config generation'
 assert_contains "$primary_output" '        192.0.2.12' 'primary config generation'
+assert_contains "$primary_output" '    timeout 2' 'health-check supervisor timeout margin'
 pass 'primary config generation'
 
 secondary_output=$(render_config \
@@ -111,6 +112,26 @@ expect_config_failure 'invalid priority rejection' 'VRRP_PRIORITY must be betwee
     -e VRRP_PRIORITY=0
 expect_config_failure 'invalid router ID rejection' 'VRRP_VIRTUAL_ROUTER_ID must be between 1 and 255' \
     -e VRRP_VIRTUAL_ROUTER_ID=256
+
+compose_output=$(NODE_NAME=test-node \
+    PIHOLE_ADDRESS=192.0.2.11 \
+    PIHOLE_PASSWORD=test-password \
+    VRRP_PRIORITY=110 \
+    VRRP_VIRTUAL_IP=192.0.2.10/24 \
+    VRRP_UNICAST_PEER=192.0.2.12 \
+    docker compose -f docker-compose.example.yaml config)
+assert_contains "$compose_output" 'network_mode: service:keepalived' 'stable network namespace ownership'
+assert_contains "$compose_output" 'condition: service_started' 'Pi-hole startup dependency'
+if printf '%s\n' "$compose_output" | awk '
+    /^  pihole:$/ { in_pihole = 1; next }
+    in_pihole && /^  [[:alnum:]_-]+:$/ { exit }
+    in_pihole && /^    hostname:/ { exit 1 }
+'; then
+    :
+else
+    fail 'stable network namespace ownership: Pi-hole cannot set hostname with service network mode'
+fi
+pass 'Keepalived owns the shared network namespace'
 
 assert_contains "$primary_output" 'Generated Keepalived configuration' 'Keepalived config validation'
 pass 'Keepalived config validation'
